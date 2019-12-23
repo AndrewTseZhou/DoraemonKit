@@ -3,11 +3,15 @@ package com.didichuxing.doraemonkit.ui.base;
 import android.view.MotionEvent;
 import android.view.View;
 
+import com.didichuxing.doraemonkit.util.UIUtils;
+
 /**
  * @author wanglikun
+ * touch 事件代理 解决点击和触摸事件的冲突
  */
 public class TouchProxy {
     private static final int MIN_DISTANCE_MOVE = 4;
+    private static final int MIN_TAP_TIME = 1000;
 
     private OnTouchEventListener mEventListener;
     private int mLastX;
@@ -30,6 +34,7 @@ public class TouchProxy {
     }
 
     public boolean onTouchEvent(View v, MotionEvent event) {
+        int distance = UIUtils.dp2px(v.getContext(), 1) * MIN_DISTANCE_MOVE;
         int x = (int) event.getRawX();
         int y = (int) event.getRawY();
         switch (event.getAction()) {
@@ -44,12 +49,12 @@ public class TouchProxy {
             }
             break;
             case MotionEvent.ACTION_MOVE: {
-                if (Math.abs(x - mStartX) < MIN_DISTANCE_MOVE
-                        && Math.abs(y - mStartY) < MIN_DISTANCE_MOVE) {
+                if (Math.abs(x - mStartX) < distance
+                        && Math.abs(y - mStartY) < distance) {
                     if (mState == TouchState.STATE_STOP) {
                         break;
                     }
-                } else if (mState != TouchState.STATE_MOVE){
+                } else if (mState != TouchState.STATE_MOVE) {
                     mState = TouchState.STATE_MOVE;
                 }
                 if (mEventListener != null) {
@@ -64,7 +69,8 @@ public class TouchProxy {
                 if (mEventListener != null) {
                     mEventListener.onUp(x, y);
                 }
-                if (mState != TouchState.STATE_MOVE) {
+                if (mState != TouchState.STATE_MOVE
+                        && event.getEventTime() - event.getDownTime() < MIN_TAP_TIME) {
                     v.performClick();
                 }
                 mState = TouchState.STATE_STOP;

@@ -11,6 +11,7 @@ import android.view.View;
 import com.didichuxing.doraemonkit.R;
 import com.didichuxing.doraemonkit.constant.BundleKey;
 import com.didichuxing.doraemonkit.ui.base.BaseFragment;
+import com.didichuxing.doraemonkit.ui.fileexplorer.FileExplorerChooseDialog;
 import com.didichuxing.doraemonkit.ui.fileexplorer.FileInfo;
 import com.didichuxing.doraemonkit.ui.fileexplorer.FileInfoAdapter;
 import com.didichuxing.doraemonkit.ui.widget.titlebar.TitleBar;
@@ -18,6 +19,7 @@ import com.didichuxing.doraemonkit.util.FileUtil;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -55,6 +57,12 @@ public class FileExplorerFragment extends BaseFragment {
                     bundle.putSerializable(BundleKey.FILE_KEY, fileInfo.file);
                     if (FileUtil.isImage(fileInfo.file)) {
                         showContent(ImageDetailFragment.class, bundle);
+                    } else if (FileUtil.isDB(fileInfo.file)) {
+                        showContent(DatabaseDetailFragment.class, bundle);
+                    } else if (FileUtil.isVideo(fileInfo.file)) {
+                        showContent(VideoPlayFragment.class, bundle);
+                    } else if (FileUtil.isSp(fileInfo.file)) {
+                        showContent(SpFragment.class, bundle);
                     } else {
                         showContent(TextDetailFragment.class, bundle);
                     }
@@ -67,13 +75,31 @@ public class FileExplorerFragment extends BaseFragment {
         });
         mFileInfoAdapter.setOnViewLongClickListener(new FileInfoAdapter.OnViewLongClickListener() {
             @Override
-            public boolean onViewLongClick(View v, FileInfo fileInfo) {
-                if (fileInfo.file.isFile()) {
-                    FileUtil.systemShare(getContext(), fileInfo.file);
-                    return true;
-                } else {
-                    return false;
-                }
+            public boolean onViewLongClick(View v, final FileInfo fileInfo) {
+
+                FileExplorerChooseDialog dialog = new FileExplorerChooseDialog(fileInfo.file, null);
+                dialog.setOnButtonClickListener(new FileExplorerChooseDialog.OnButtonClickListener() {
+                    @Override
+                    public void onDeleteClick(FileExplorerChooseDialog dialog) {
+                        FileUtil.deleteDirectory(fileInfo.file);
+                        dialog.dismiss();
+
+                        if (mCurDir != null) {
+                            mTitleBar.setTitle(mCurDir.getName());
+                            setAdapterData(getFileInfos(mCurDir));
+                        }
+
+                    }
+
+                    @Override
+                    public void onShareClick(FileExplorerChooseDialog dialog) {
+                        FileUtil.systemShare(getContext(), fileInfo.file);
+                        dialog.dismiss();
+
+                    }
+                });
+                showDialog(dialog);
+                return true;
             }
         });
         setAdapterData(initRootFileInfos(getContext()));
@@ -89,6 +115,9 @@ public class FileExplorerFragment extends BaseFragment {
 
     private List<FileInfo> getFileInfos(File dir) {
         List<FileInfo> fileInfos = new ArrayList<>();
+        if (dir.listFiles() == null) {
+            return fileInfos;
+        }
         for (File file : dir.listFiles()) {
             FileInfo fileInfo = new FileInfo(file);
             fileInfos.add(fileInfo);
@@ -104,9 +133,10 @@ public class FileExplorerFragment extends BaseFragment {
     @Override
     protected boolean onBackPressed() {
         if (mCurDir == null) {
-            getActivity().finish();
+            finish();
             return true;
-        } if (isRootFile(getContext(), mCurDir)) {
+        }
+        if (isRootFile(getContext(), mCurDir)) {
             mTitleBar.setTitle(R.string.dk_kit_file_explorer);
             setAdapterData(initRootFileInfos(getContext()));
             mCurDir = null;
@@ -129,6 +159,28 @@ public class FileExplorerFragment extends BaseFragment {
     }
 
     private List<FileInfo> initRootFileInfos(Context context) {
+        List<File> rootFiles = getRootFiles();
+        if (rootFiles != null) {
+            List<FileInfo> fileInfos = new ArrayList<>();
+            for (File file : rootFiles) {
+                fileInfos.add(new FileInfo(file));
+            }
+            return fileInfos;
+        }
+        return initDefaultRootFileInfos(context);
+    }
+
+    private List<File> getRootFiles() {
+        if (getArguments() != null) {
+            File dir = (File) getArguments().getSerializable(BundleKey.DIR_KEY);
+            if (dir != null && dir.exists()) {
+                return Arrays.asList(dir.listFiles());
+            }
+        }
+        return null;
+    }
+
+    private List<FileInfo> initDefaultRootFileInfos(Context context) {
         List<FileInfo> fileInfos = new ArrayList<>();
         fileInfos.add(new FileInfo(context.getFilesDir().getParentFile()));
         fileInfos.add(new FileInfo(context.getExternalCacheDir()));
@@ -139,6 +191,12 @@ public class FileExplorerFragment extends BaseFragment {
     private boolean isRootFile(Context context, File file) {
         if (file == null) {
             return false;
+        }
+        List<File> rootFiles = getRootFiles();
+        if (rootFiles != null) {
+            for (File rootFile : rootFiles) {
+                return file.equals(rootFile);
+            }
         }
         return file.equals(context.getExternalCacheDir())
                 || file.equals(context.getExternalFilesDir(null))

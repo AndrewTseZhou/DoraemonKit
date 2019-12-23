@@ -6,20 +6,20 @@
 //
 
 #import "DoraemonANRManager.h"
+#import "DoraemonCacheManager.h"
 #import "DoraemonANRTracker.h"
-#import <BSBacktraceLogger/BSBacktraceLogger.h>
-#import "DoraemonUtil.h"
 #import "DoraemonMemoryUtil.h"
 #import "DoraemonAppInfoUtil.h"
 #import "Doraemoni18NUtil.h"
-#import <AFNetworking/AFNetworking.h>
+#import "DoraemonANRTool.h"
 
 //默认超时间隔
-static int64_t const kDoraemonBlockMonitorTimeInterval = 2.;
+static int64_t const kDoraemonBlockMonitorTimeInterval = 1.;
 
 @interface DoraemonANRManager()
 
 @property (nonatomic, strong) DoraemonANRTracker *doraemonANRTracker;
+@property (nonatomic, copy) DoraemonANRManagerBlock block;
 
 @end
 
@@ -41,6 +41,15 @@ static int64_t const kDoraemonBlockMonitorTimeInterval = 2.;
     if (self) {
         _doraemonANRTracker = [[DoraemonANRTracker alloc] init];
         _timeOut = kDoraemonBlockMonitorTimeInterval;
+        _anrTrackOn = [DoraemonCacheManager sharedInstance].anrTrackSwitch;
+        if (_anrTrackOn) {
+            [self start];
+        } else {
+            [self stop];
+            // 如果是关闭的话，删除上一次的卡顿记录
+            NSFileManager *fm = [NSFileManager defaultManager];
+            [fm removeItemAtPath:[DoraemonANRTool anrDirectory] error:nil];
+        }
     }
     
     return self;
@@ -48,31 +57,24 @@ static int64_t const kDoraemonBlockMonitorTimeInterval = 2.;
 
 - (void)start {
     __weak typeof(self) weakSelf = self;
-    [_doraemonANRTracker startWithThreshold:self.timeOut
-                               handler:^(double threshold) {
-                                   [weakSelf dump];
-                               }];
+    [_doraemonANRTracker startWithThreshold:self.timeOut handler:^(NSDictionary *info) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        [strongSelf dumpWithInfo:info];
+    }];
 }
 
-- (void)dump {
-    //方法一：使用 BSBacktraceLogger 打印方法调用栈
-    //BSLOG  // 打印当前线程的调用栈
-    //BSLOG_ALL  // 打印所有线程的调用栈
-    //BSLOG_MAIN  // 打印主线程调用栈
-    
-    NSString *report = [BSBacktraceLogger bs_backtraceOfMainThread];
-    if (!report) {
-        report = DoraemonLocalizedString(@"空的report");
+- (void)dumpWithInfo:(NSDictionary *)info {
+    if (![info isKindOfClass:[NSDictionary class]]) {
+        return;
     }
-    
-    if (!_anrArray) {
-        _anrArray = [NSMutableArray array];
+    if (self.block) {
+        self.block(info);
     }
-    NSDictionary *dic = @{
-                          @"title":[DoraemonUtil dateFormatNow],
-                          @"content":report
-                          };
-    [_anrArray addObject:dic];
+    [DoraemonANRTool saveANRInfo:info];
+}
+
+- (void)addANRBlock:(DoraemonANRManagerBlock)block{
+    self.block = block;
 }
 
 
@@ -83,4 +85,10 @@ static int64_t const kDoraemonBlockMonitorTimeInterval = 2.;
 - (void)stop {
     [self.doraemonANRTracker stop];
 }
+
+- (void)setAnrTrackOn:(BOOL)anrTrackOn {
+    _anrTrackOn = anrTrackOn;
+    [[DoraemonCacheManager sharedInstance] saveANRTrackSwitch:anrTrackOn];
+}
+
 @end

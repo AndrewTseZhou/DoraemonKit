@@ -1,4 +1,132 @@
 # Release Notes
+
+### 2.0.0
+1、支持旧版本Xcdoe编译SDK无法通过的问题
+2、解决2.0前置版本1.2.4的相关问题
+
+### 1.2.4
+1、新增函数耗时功能
+
+2、新增UI层级检查功能
+
+3、新增内存泄漏功能
+
+4、支持iOS13暗黑模式
+
+5、支持Carthage接入方式
+
+6、其他的一些优化，详见代码提交记录
+
+### 1.2.3
+1、为了解决调用空的NSArray和NSSet的description，会crash的问题。
+
+### 1.2.2
+1、App启动耗时统计
+
+2、Xcode控制台打印字典、数组等集合中的中文显示为unicode的问题
+
+3、组件检查或者对齐标尺组件打开后切换rootviewcontroller后失去响应
+
+4、重启APP mock的定位数据仍然生效
+
+5、消除SDK的warning
+
+6、其他的一些优化，详见代码提交记录
+
+### 1.2.1
+1、大图检测功能[0xd-cc](https://github.com/0xd-cc)
+
+2、修复元素边框线crash的问题
+
+3、添加应用内数据库调试功能 [y500](https://github.com/y500)
+
+4、横屏适配bug fix
+
+5、支持下CocoaPods1.7 的generate_multiple_pod_projects新特性
+
+6、多次执行install方法保护，避免出现多次初始化UI界面出错
+
+### 1.2.0
+1. 加入Weex专项工具，包括：
+2. **【console日志查看】** 方便在端上查看每一个Weex文件中的console日志，提供分级和搜索功能
+3. **【storage缓存查看】** 将Weex中的storage模块的本地缓存数据可视化展示
+4. **【容器信息】** 查看每一个打开的Weex页面的基本信息和性能数据
+5. **【DevTool】** 快速开启Weex DevTool的扫码入口
+
+### 1.1.9
+1、H5任意门支持扫码和历史浏览记录功能 [feng562925462](https://github.com/feng562925462)
+
+2、支持使用block的方式接入自定义测试模块 [csc-EricWu](https://github.com/csc-EricWu/)
+
+3、卡顿监控支持查看卡顿时长 [k373379320](https://github.com/k373379320)
+
+4、沙盒浏览，除了数据库文件之外，其他文件修改成 QLPreviewController 打开 [HuginChen](https://github.com/HuginChen)
+
+5、支持framework直接接入，方便非pod管理的项目
+
+6、性能曲线图代码重构,支持同时查看fps、内存、cpu和流量的信息。
+
+7、解决toast在某一些情况无法显示的问题,改善用户体验
+
+8、其他一些优化和代码整理，详见代码提交记录
+
+
+### 1.1.8
+1、支持国际化，中英文
+
+2、适配横屏 @ [Hugin](https://github.com/HuginChen)
+
+3、修复强持有 CLLocationManagerDelegate 不释放的问题 @[li6185377](https://github.com/li6185377)
+
+4、iOS沙盒浏览器优化 @[csc-EricWu](https://github.com/csc-EricWu/)
+
+5、支持主动控制隐藏显示DoKit入口
+
+6、app信息页面 权限cell可以直接跳转到权限设置页面进行设置
+
+7、其他一些优化和代码整理，详见代码提交记录
+
+
+## 1.1.7
+1、支持数据库文件本地预览功能
+
+2、支持word、pdf、html文件本地预览功能
+
+3、解决ipad上crash问题
+
+4、解决低版本手机适配问题
+
+5、mockGPS更加通用
+
+6、其他的一些issues解决和PR合并，详见代码提交记录
+
+
+## 1.1.6
+1、去掉对于AFNetworking的多余依赖
+
+2、颜色拾取器优化，方便更加准确的选取字体的颜色
+
+3、大文本显示的时候，UIlabel在模拟器上会显示空白，使用TextView代替
+
+4、pluginDidLoad回调，将itemData返回
+
+5、解决和JGProgressHUD的layoutSubviews 循环调用的问题
+
+6、适配iOS9状态栏不显示的问题
+
+7、DoraemonLoadAnalyze改成可选的pod依赖
+
+## 1.1.5
+1、更新DoraemonLoadAnalyze.framework支持bitcode
+
+2、修复 iOS11以下版本点击沙盒浏览功能崩溃
+
+3、修复 NSLog 未适配iPhone X以上机型
+
+4、流量详情的每一个cell中的数据支持复制
+
+5、其他一些优化和bug fix，详见代码提交记录
+
 ## 1.1.4
 1、新增Load函数耗时检测功能
 

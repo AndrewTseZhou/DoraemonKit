@@ -7,69 +7,28 @@ import android.media.projection.MediaProjectionManager;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
 import android.view.View;
 
 import com.didichuxing.doraemonkit.R;
 import com.didichuxing.doraemonkit.config.ColorPickConfig;
-import com.didichuxing.doraemonkit.constant.PageTag;
+import com.didichuxing.doraemonkit.constant.DokitConstant;
 import com.didichuxing.doraemonkit.constant.RequestCode;
 import com.didichuxing.doraemonkit.ui.base.BaseFragment;
-import com.didichuxing.doraemonkit.ui.base.FloatPageManager;
-import com.didichuxing.doraemonkit.ui.base.PageIntent;
-import com.didichuxing.doraemonkit.ui.setting.SettingItem;
-import com.didichuxing.doraemonkit.ui.setting.SettingItemAdapter;
-import com.didichuxing.doraemonkit.ui.widget.titlebar.HomeTitleBar;
+import com.didichuxing.doraemonkit.ui.base.DokitIntent;
+import com.didichuxing.doraemonkit.ui.base.DokitViewManager;
 
 /**
  * Created by wanglikun on 2018/9/15.
  */
 
 public class ColorPickerSettingFragment extends BaseFragment {
-    private HomeTitleBar mTitleBar;
-    private SettingItem mSettingItem;
-    private RecyclerView mSettingList;
-    private SettingItemAdapter mSettingItemAdapter;
+
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        initTitleBar();
-    }
-
-    private void initTitleBar() {
-        mTitleBar = findViewById(R.id.title_bar);
-        mTitleBar.setListener(new HomeTitleBar.OnTitleBarClickListener() {
-            @Override
-            public void onRightClick() {
-                finish();
-            }
-        });
-        mSettingItem = new SettingItem(R.string.dk_kit_color_picker, ColorPickConfig.isColorPickOpen(getContext()));
-        mSettingList = findViewById(R.id.setting_list);
-        mSettingList.setLayoutManager(new LinearLayoutManager(getContext()));
-        mSettingItemAdapter = new SettingItemAdapter(getContext());
-        mSettingItemAdapter.setOnSettingItemSwitchListener(new SettingItemAdapter.OnSettingItemSwitchListener() {
-            @Override
-            public void onSettingItemSwitch(View view, SettingItem data, boolean on) {
-                if (mSettingItem == data) {
-                    if (on) {
-                        boolean result = requestCaptureScreen();
-                        if (!result) {
-                            mSettingItem.isChecked = true;
-                            mSettingItemAdapter.notifyDataSetChanged();
-                        }
-                    } else {
-                        FloatPageManager.getInstance().removeAll(ColorPickerFloatPage.class);
-                        FloatPageManager.getInstance().removeAll(ColorPickerInfoFloatPage.class);
-                    }
-                    ColorPickConfig.setColorPickOpen(getContext(), on);
-                }
-            }
-        });
-        mSettingItemAdapter.append(mSettingItem);
-        mSettingList.setAdapter(mSettingItemAdapter);
+        requestCaptureScreen();
+        ColorPickConfig.setColorPickOpen(getContext(), true);
     }
 
     private boolean requestCaptureScreen() {
@@ -88,24 +47,34 @@ public class ColorPickerSettingFragment extends BaseFragment {
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == RequestCode.CAPTURE_SCREEN && resultCode == Activity.RESULT_OK) {
+            if (!DokitConstant.IS_NORMAL_FLOAT_MODE) {
+                finish();
+            }
             showColorPicker(data);
-            finish();
         } else {
-            mSettingItem.isChecked = true;
-            mSettingItemAdapter.notifyDataSetChanged();
+            showToast("start color pick fail");
+            finish();
         }
     }
 
+    /**
+     * 显示颜色拾取器
+     *
+     * @param data
+     */
     private void showColorPicker(Intent data) {
-        PageIntent pageIntent = new PageIntent(ColorPickerInfoFloatPage.class);
-        pageIntent.tag = PageTag.PAGE_COLOR_PICKER_INFO;
-        pageIntent.mode = PageIntent.MODE_SINGLE_INSTANCE;
-        FloatPageManager.getInstance().add(pageIntent);
+        DokitViewManager.getInstance().detachToolPanel();
 
-        pageIntent = new PageIntent(ColorPickerFloatPage.class);
+        DokitIntent pageIntent = new DokitIntent(ColorPickerInfoDokitView.class);
+        pageIntent.mode = DokitIntent.MODE_SINGLE_INSTANCE;
+        DokitViewManager.getInstance().attach(pageIntent);
+
+        pageIntent = new DokitIntent(ColorPickerDokitView.class);
         pageIntent.bundle = data.getExtras();
-        pageIntent.mode = PageIntent.MODE_SINGLE_INSTANCE;
-        FloatPageManager.getInstance().add(pageIntent);
+        pageIntent.mode = DokitIntent.MODE_SINGLE_INSTANCE;
+        DokitViewManager.getInstance().attach(pageIntent);
+
+
     }
 
     @Override

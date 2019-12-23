@@ -18,12 +18,14 @@
 
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSArray *dataArray;
-@property (nonatomic, strong) CTCellularData *cellularData;
+@property (nonatomic, strong) CTCellularData *cellularData API_AVAILABLE(ios(9.0));
 @property (nonatomic, copy) NSString *authority;
 
 @end
 
-@implementation DoraemonAppInfoViewController
+@implementation DoraemonAppInfoViewController{
+    
+}
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -34,8 +36,10 @@
 
 - (void)viewDidDisappear:(BOOL)animated{
     [super viewDidDisappear:animated];
-    _cellularData.cellularDataRestrictionDidUpdateNotifier = nil;
-    _cellularData = nil;
+    if (@available(iOS 9.0, *)){
+        _cellularData.cellularDataRestrictionDidUpdateNotifier = nil;
+        _cellularData = nil;
+    }
 }
 
 - (BOOL)needBigTitleView{
@@ -47,7 +51,15 @@
     self.title = DoraemonLocalizedString(@"App基本信息");
 
     self.tableView = [[UITableView alloc] initWithFrame:CGRectMake(0, self.bigTitleView.doraemon_bottom, self.view.doraemon_width, self.view.doraemon_height-self.bigTitleView.doraemon_bottom) style:UITableViewStyleGrouped];
-    self.tableView.backgroundColor = [UIColor whiteColor];
+#if defined(__IPHONE_13_0) && (__IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_13_0)
+    if (@available(iOS 13.0, *)) {
+        self.tableView.backgroundColor = [UIColor systemBackgroundColor];
+    } else {
+#endif
+        self.tableView.backgroundColor = [UIColor whiteColor];
+#if defined(__IPHONE_13_0) && (__IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_13_0)
+    }
+#endif
     self.tableView.delegate = self;
     self.tableView.dataSource = self;
     self.tableView.estimatedRowHeight = 0.;
@@ -81,21 +93,23 @@
     NSString *locationAuthority = [DoraemonAppInfoUtil locationAuthority];
     
     //获取网络权限
-    _cellularData = [[CTCellularData alloc]init];
-    __weak typeof(self) weakSelf = self;
-    _cellularData.cellularDataRestrictionDidUpdateNotifier = ^(CTCellularDataRestrictedState state) {
-        if (state == kCTCellularDataRestricted) {
-            weakSelf.authority = @"Restricted";
-        }else if(state == kCTCellularDataNotRestricted){
-            weakSelf.authority = @"NotRestricted";
-        }else{
-            weakSelf.authority = @"Unknown";
-        }
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [weakSelf.tableView reloadData];
-        });
-        
-    };
+    if (@available(iOS 9.0, *)) {
+        _cellularData = [[CTCellularData alloc]init];
+        __weak typeof(self) weakSelf = self;
+        _cellularData.cellularDataRestrictionDidUpdateNotifier = ^(CTCellularDataRestrictedState state) {
+            if (state == kCTCellularDataRestricted) {
+                weakSelf.authority = @"Restricted";
+            }else if(state == kCTCellularDataNotRestricted){
+                weakSelf.authority = @"NotRestricted";
+            }else{
+                weakSelf.authority = @"Unknown";
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [weakSelf.tableView reloadData];
+            });
+            
+        };
+    }
     
     //获取push权限
     NSString *pushAuthority = [DoraemonAppInfoUtil pushAuthority];
@@ -211,15 +225,15 @@
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    return kDoraemonSizeFrom750(120);
+    return kDoraemonSizeFrom750_Landscape(120);
 }
 
 - (nullable UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section{
-    UIView *sectionView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.view.doraemon_width, kDoraemonSizeFrom750(120))];
-    UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(kDoraemonSizeFrom750(32), 0, DoraemonScreenWidth-kDoraemonSizeFrom750(32), kDoraemonSizeFrom750(120))];
+    UIView *sectionView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.view.doraemon_width, kDoraemonSizeFrom750_Landscape(120))];
+    UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(kDoraemonSizeFrom750_Landscape(32), 0, DoraemonScreenWidth-kDoraemonSizeFrom750_Landscape(32), kDoraemonSizeFrom750_Landscape(120))];
     NSDictionary *dic = _dataArray[section];
     titleLabel.text = dic[@"title"];
-    titleLabel.font = [UIFont systemFontOfSize:kDoraemonSizeFrom750(28)];
+    titleLabel.font = [UIFont systemFontOfSize:kDoraemonSizeFrom750_Landscape(28)];
     titleLabel.textColor = [UIColor doraemon_black_3];
     [sectionView addSubview:titleLabel];
     return sectionView;
@@ -247,6 +261,15 @@
     return cell;
 }
 
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath{
+    if(indexPath.section == 2){
+        NSURL * url = [NSURL URLWithString:UIApplicationOpenSettingsURLString];
+        if([[UIApplication sharedApplication] canOpenURL:url]) {
+            NSURL*url =[NSURL URLWithString:UIApplicationOpenSettingsURLString];
+            [[UIApplication sharedApplication] openURL:url];
+        }
+    }
+}
 
 
 @end

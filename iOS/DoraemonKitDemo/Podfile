@@ -1,6 +1,6 @@
 platform:ios,’8.0’
 #use_frameworks!
-inhibit_all_warnings!
+#inhibit_all_warnings! #消除第三方仓库的警告
 source 'git@github.com:CocoaPods/Specs.git'
 
 post_install do |installer|
@@ -12,6 +12,8 @@ post_install do |installer|
 end
 
 target :'DoraemonKitDemo' do
-    pod 'DoraemonKit', :subspecs => ['Core','WithLogger','WithGPS'],  :path => '../../'
-    pod 'AFNetworking','2.6.3'
+  pod 'DoraemonKit', :subspecs => ['Core','WithLogger','WithGPS','WithLoad','WithWeex', 'WithDatabase', 'WithMLeaksFinder'],  :path => '../../'
+  #pod 'DoraemonKit', :subspecs => ['Core','WithLogger','WithGPS','WithLoad']
+  pod 'AFNetworking','2.6.3'
+  pod 'SDWebImage', '5.0.6'
 end

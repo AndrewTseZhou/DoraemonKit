@@ -4,51 +4,49 @@
 
 ```
 dependencies {
-	...
-    debugImplementation 'com.didichuxing.doraemonkit:doraemonkit:1.0.5'
-    releaseImplementation 'com.didichuxing.doraemonkit:doraemonkit-no-op:1.0.5'
-    ...
+    …
+    debugImplementation 'com.didichuxing.doraemonkit:doraemonkit:2.2.1'
+    releaseImplementation 'com.didichuxing.doraemonkit:doraemonkit-no-op:2.2.1'
+    …
 }
 ```
 
-Please use [the latest release](android-ReleaseNotes.md)。
-
+Please use [the latest release](android-ReleaseNotes.md).
 
 
 #### 2. Install
 
-Install `DoraemonKit` in `Application::onCreate()`.
+Install `DoraemonKit` in `Application#onCreate()`.
 
-```
+```Java
 @Override
 public void onCreate() {
-	...
+    …
     DoraemonKit.install(application）
      
     // for web container debug, optional
     DoraemonKit.setWebDoorCallback(new WebDoorManager.WebDoorCallback() {
     @Override
-    public void overrideUrlLoading(String s) {
+    public void overrideUrlLoading(Context context, String s) {
         // use your web container open the link
     }
-    ...
+    …
 } 
 ```
-
 
 
 #### 3. Network Monitor（Optional）
 
 Add a dependency in `build.gradle` in root of host project as following.
 
-```
+```groovy
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
     dependencies {
-        ...
-        classpath 'com.didichuxing.doraemonkit:compiler:1.0.0'
-        ...
+        …
+        classpath 'com.didichuxing.doraemonkit:doraemonkit-plugin:1.0.0'
+        …
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
     }
@@ -57,11 +55,11 @@ buildscript {
 
 Apply plugin in application module of `build.gradle`
 
-```
-...
-apply plugin: 'com.doraemon.compiler.plugin'
-```
+```groovy
+apply plugin: 'com.didi.dokit'
 
+
+```
 
 
 #### 4. Custom Component（Optional）
@@ -70,7 +68,7 @@ Define a class implement the interface IKit，the interface describe a component
 
 An environment switch component can be defined as following.
 
-```
+```Java
 public class EnvSwitchKit implements IKit {
     @Override
     public int getCategory() {
@@ -100,13 +98,13 @@ public class EnvSwitchKit implements IKit {
 }
 ```
 
-Register the environment switch component when DoraemonKit installed.
+Register the environment switch component when `DoraemonKit` installed.
 
-```
+```Java
 @Override
 public void onCreate() {
     kits.add(new EnvSwitchKit());
     DoraemonKit.install(application, kits);
-    ...
+    …
 }
 ```

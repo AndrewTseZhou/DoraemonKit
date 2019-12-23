@@ -6,6 +6,7 @@ import android.support.annotation.IdRes;
 import android.support.annotation.LayoutRes;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.annotation.StringRes;
 import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -13,13 +14,18 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
-import com.didichuxing.doraemonkit.ui.FloatIconPage;
+import com.didichuxing.doraemonkit.ui.main.FloatIconDokitView;
+import com.didichuxing.doraemonkit.ui.dialog.DialogProvider;
+import com.didichuxing.doraemonkit.ui.dialog.CommonDialogProvider;
+import com.didichuxing.doraemonkit.ui.dialog.DialogInfo;
+import com.didichuxing.doraemonkit.ui.dialog.UniversalDialogFragment;
 
 /**
  * Created by wanglikun on 2018/10/26.
  */
 
 public class BaseFragment extends Fragment {
+    public String TAG = this.getClass().getSimpleName();
     private View mRootView;
     private int mContainer;
 
@@ -67,9 +73,11 @@ public class BaseFragment extends Fragment {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        FloatPageManager.getInstance().removeAll(FloatIconPage.class);
-
+        DokitViewManager.getInstance().detach(FloatIconDokitView.class);
     }
+
+
+
 
     private void tryGetContainerId() {
         if (mRootView != null) {
@@ -103,6 +111,10 @@ public class BaseFragment extends Fragment {
         Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
     }
 
+    public void showToast(@StringRes int res) {
+        Toast.makeText(getContext(), res, Toast.LENGTH_SHORT).show();
+    }
+
     public void showContent(Class<? extends BaseFragment> fragmentClass, Bundle bundle) {
         BaseActivity activity = (BaseActivity) getActivity();
         if (activity != null) {
@@ -124,8 +136,25 @@ public class BaseFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        PageIntent intent = new PageIntent(FloatIconPage.class);
-        intent.mode = PageIntent.MODE_SINGLE_INSTANCE;
-        FloatPageManager.getInstance().add(intent);
+        DokitIntent intent = new DokitIntent(FloatIconDokitView.class);
+        intent.mode = DokitIntent.MODE_SINGLE_INSTANCE;
+        DokitViewManager.getInstance().attach(intent);
+    }
+
+    public DialogProvider showDialog(DialogInfo dialogInfo) {
+        CommonDialogProvider provider = new CommonDialogProvider(dialogInfo, dialogInfo.listener);
+        showDialog(provider);
+        return provider;
+    }
+
+    public void showDialog(DialogProvider provider) {
+        UniversalDialogFragment dialog = new UniversalDialogFragment();
+        provider.setHost(dialog);
+        dialog.setProvider(provider);
+        provider.show(getChildFragmentManager());
+    }
+
+    public void dismissDialog(DialogProvider provider) {
+        provider.dismiss();
     }
 }

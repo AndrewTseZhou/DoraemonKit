@@ -4,28 +4,35 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.os.Build;
 import android.os.Debug;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
 import android.support.annotation.RequiresApi;
 import android.text.TextUtils;
+import android.text.format.DateUtils;
 import android.view.Choreographer;
-import android.widget.Toast;
 
-import com.didichuxing.doraemonkit.R;
-import com.didichuxing.doraemonkit.adb.AdbManager;
-import com.didichuxing.doraemonkit.adb.Callback;
+import com.blankj.utilcode.util.ActivityUtils;
+import com.didichuxing.doraemonkit.DoraemonKit;
+import com.didichuxing.doraemonkit.config.PerformanceSpInfoConfig;
+import com.didichuxing.doraemonkit.kit.custom.UploadMonitorInfoBean;
+import com.didichuxing.doraemonkit.kit.custom.UploadMonitorItem;
+import com.didichuxing.doraemonkit.kit.network.NetworkManager;
 import com.didichuxing.doraemonkit.util.FileManager;
+import com.didichuxing.doraemonkit.util.JsonUtil;
 import com.didichuxing.doraemonkit.util.LogHelper;
+import com.didichuxing.doraemonkit.util.threadpool.ThreadPoolProxyFactory;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 
 /**
@@ -34,20 +41,22 @@ import java.util.Date;
 
 public class PerformanceDataManager {
     private static final String TAG = "PerformanceDataManager";
-    private static final float SECOND_IN_NANOS = 1000000000f;
+    private static final int MAX_FRAME_RATE = 60;
     private static final int NORMAL_FRAME_RATE = 1;
-    private String filePath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/doraemon/";
     private String memoryFileName = "memory.txt";
     private String cpuFileName = "cpu.txt";
     private String fpsFileName = "fps.txt";
+    private String customFileName = "custom.txt"; //自定义测试页面保存的文件名称
 
     private SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    private long mLastFrameTimeNanos;
-    private int mLastFrameRate;
+    private int mLastFrameRate = MAX_FRAME_RATE;
     private int mLastSkippedFrames;
     private float mLastCpuRate;
     private float mLastMemoryInfo;
-    private String mPackageName;
+    private long mUpBytes;
+    private long mDownBytes;
+    private long mLastUpBytes;
+    private long mLastDownBytes;
     private Handler mHandler;
     private HandlerThread mHandlerThread;
     private float mMaxMemory;
@@ -58,53 +67,21 @@ public class PerformanceDataManager {
     private Long mLastCpuTime;
     private Long mLastAppCpuTime;
     private boolean mAboveAndroidO; // 是否是8.0及其以上
-    private boolean mHasRemindUser;
     private static final int MSG_CPU = 1;
     private static final int MSG_MEMORY = 2;
-    private static final int MSG_REMIND = 3;
+    private static final int MSG_SAVE_LOCAL = 3;
+    private static final int MSG_NET_FLOW = 4;
+    private UploadMonitorInfoBean mUploadMonitorBean;
+    private boolean mUploading;
+    private Handler mMainHandler = new Handler(Looper.getMainLooper());
+    private FrameRateRunnable mRateRunnable = new FrameRateRunnable();
 
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
-    private Choreographer.FrameCallback mFrameCallback = new Choreographer.FrameCallback() {
-        @Override
-        public void doFrame(long frameTimeNanos) {
-            if (mLastFrameTimeNanos != 0L) {
-                long temp = frameTimeNanos - mLastFrameTimeNanos;
-                if (temp != 0) {
-                    mLastFrameRate = Math.round(SECOND_IN_NANOS / (frameTimeNanos - mLastFrameTimeNanos));
-                    mLastSkippedFrames = 60 - mLastFrameRate;
-                }
-            }
-            mLastFrameTimeNanos = frameTimeNanos;
-            Choreographer.getInstance().postFrameCallback(this);
-            writeFpsDataIntoFile();
-        }
-    };
-
-    private void excuteCpuData() {
+    private void executeCpuData() {
         LogHelper.d(TAG, "current thread name is ==" + Thread.currentThread().getName());
         if (mAboveAndroidO) {
-            //8.0之后由于权限问题只能通过adb的方式获取
-            AdbManager.getInstance().performAdbRequest("shell:dumpsys cpuinfo | grep '" + mPackageName + "'",
-                    new Callback() {
-                        @Override
-                        public void onSuccess(String adbResponse) {
-                            LogHelper.d(TAG, "response is " + adbResponse);
-                            try {
-                                mLastCpuRate = parseCPUData(adbResponse);
-                                writeCpuDataIntoFile();
-                            } catch (IOException e) {
-                                LogHelper.d(TAG, "parse data fail " + e.getMessage());
-                                mHandler.sendEmptyMessage(MSG_REMIND);
-                                e.printStackTrace();
-                            }
-                        }
-
-                        @Override
-                        public void onFail(String failString) {
-                            mHandler.sendEmptyMessage(MSG_REMIND);
-                            LogHelper.d(TAG, "failString is " + failString);
-                        }
-                    });
+            mLastCpuRate = getCpuDataForO();
+            LogHelper.d(TAG, "cpu info is =" + mLastCpuRate);
+            writeCpuDataIntoFile();
         } else {
             mLastCpuRate = getCPUData();
             LogHelper.d(TAG, "cpu info is =" + mLastCpuRate);
@@ -112,42 +89,65 @@ public class PerformanceDataManager {
         }
     }
 
-    private void excuteMemoruData() {
-        if (mAboveAndroidO) {
-            //8.0之后由于权限问题只能通过adb的方式获取
-            AdbManager.getInstance().performAdbRequest("shell:dumpsys meminfo | grep '" + mPackageName + "'",
-                    new Callback() {
-                        @Override
-                        public void onSuccess(String adbResponse) {
-                            LogHelper.d(TAG, "response is " + adbResponse);
-                            try {
-                                mLastMemoryInfo = parseMemoryData(adbResponse);
-                                writeMemoryDataIntoFile();
-                            } catch (IOException e) {
-                                mHandler.sendEmptyMessage(MSG_REMIND);
-                                LogHelper.d(TAG, "parse data fail " + e.getMessage());
-                                e.printStackTrace();
-                            }
-                        }
-
-                        @Override
-                        public void onFail(String failString) {
-                            mHandler.sendEmptyMessage(MSG_REMIND);
-                            LogHelper.d(TAG, "failString is " + failString);
-                        }
-                    });
-        } else {
-            mLastMemoryInfo = getMemoryData();
-            LogHelper.d(TAG, "memory info is =" + mLastMemoryInfo);
-            writeMemoryDataIntoFile();
+    private float getCpuDataForO() {
+        java.lang.Process process = null;
+        try {
+            process = Runtime.getRuntime().exec("top -n 1");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            int cpuIndex = -1;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (TextUtils.isEmpty(line)) {
+                    continue;
+                }
+                int tempIndex = getCPUIndex(line);
+                if (tempIndex != -1) {
+                    cpuIndex = tempIndex;
+                    continue;
+                }
+                if (line.startsWith(String.valueOf(Process.myPid()))) {
+                    if (cpuIndex == -1) {
+                        continue;
+                    }
+                    String[] param = line.split("\\s+");
+                    if (param.length <= cpuIndex) {
+                        continue;
+                    }
+                    String cpu = param[cpuIndex];
+                    if (cpu.endsWith("%")) {
+                        cpu = cpu.substring(0, cpu.lastIndexOf("%"));
+                    }
+                    float rate = Float.parseFloat(cpu) / Runtime.getRuntime().availableProcessors();
+                    return rate;
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
         }
+        return 0;
     }
 
-    private void remindUserToConnectPort() {
-        if (!mHasRemindUser) {
-            mHasRemindUser = true;
-            Toast.makeText(mContext, R.string.dk_cpu_memory_remind_user, Toast.LENGTH_LONG).show();
+    private int getCPUIndex(String line) {
+        if (line.contains("CPU")) {
+            String[] titles = line.split("\\s+");
+            for (int i = 0; i < titles.length; i++) {
+                if (titles[i].contains("CPU")) {
+                    return i;
+                }
+            }
         }
+        return -1;
+    }
+
+    private void executeMemoryData() {
+        mLastMemoryInfo = getMemoryData();
+        LogHelper.d(TAG, "memory info is =" + mLastMemoryInfo);
+        writeMemoryDataIntoFile();
     }
 
     private static class Holder {
@@ -162,12 +162,10 @@ public class PerformanceDataManager {
     }
 
     public void init(Context context) {
-        mContext = context;
-        mActivityManager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        mContext = context.getApplicationContext();
+        mActivityManager = (ActivityManager) DoraemonKit.APPLICATION.getSystemService(Context.ACTIVITY_SERVICE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             mAboveAndroidO = true;
-            mPackageName = context.getPackageName();
-            AdbManager.getInstance().init(context);
         }
         if (mHandlerThread == null) {
             mHandlerThread = new HandlerThread("handler-thread");
@@ -179,31 +177,87 @@ public class PerformanceDataManager {
                 public void handleMessage(Message msg) {
                     super.handleMessage(msg);
                     if (msg.what == MSG_CPU) {
-                        excuteCpuData();
+                        executeCpuData();
                         mHandler.sendEmptyMessageDelayed(MSG_CPU, NORMAL_FRAME_RATE * 1000);
                     } else if (msg.what == MSG_MEMORY) {
-                        excuteMemoruData();
+                        executeMemoryData();
                         mHandler.sendEmptyMessageDelayed(MSG_MEMORY, NORMAL_FRAME_RATE * 1000);
-                    } else if (msg.what == MSG_REMIND) {
-                        remindUserToConnectPort();
+                    } else if (msg.what == MSG_NET_FLOW){
+                        mLastUpBytes = NetworkManager.get().getTotalRequestSize() - mUpBytes;
+                        mLastDownBytes = NetworkManager.get().getTotalResponseSize() - mDownBytes;
+                        mHandler.sendEmptyMessageDelayed(MSG_NET_FLOW, NORMAL_FRAME_RATE * 1000);
+                    } else if (msg.what == MSG_SAVE_LOCAL){
+                        saveToLocal();
+                        mHandler.sendEmptyMessageDelayed(MSG_SAVE_LOCAL, NORMAL_FRAME_RATE * 1000);
                     }
                 }
             };
         }
     }
 
+    private String getFilePath(Context context) {
+        return context.getCacheDir() + File.separator + "doraemon/";
+    }
+
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
     public void startMonitorFrameInfo() {
-        Choreographer.getInstance().postFrameCallback(mFrameCallback);
+        //开启定时任务
+        mMainHandler.postDelayed(mRateRunnable, DateUtils.SECOND_IN_MILLIS);
+        Choreographer.getInstance().postFrameCallback(mRateRunnable);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
     public void stopMonitorFrameInfo() {
-        Choreographer.getInstance().removeFrameCallback(mFrameCallback);
+        Choreographer.getInstance().removeFrameCallback(mRateRunnable);
+        mMainHandler.removeCallbacks(mRateRunnable);
     }
 
     public void startMonitorCPUInfo() {
         mHandler.sendEmptyMessageDelayed(MSG_CPU, NORMAL_FRAME_RATE * 1000);
+    }
+
+    public void startMonitorNetFlowInfo() {
+        mHandler.sendEmptyMessageDelayed(MSG_NET_FLOW, NORMAL_FRAME_RATE * 1000);
+    }
+
+    public void stopMonitorNetFlowInfo() {
+        mHandler.removeMessages(MSG_NET_FLOW);
+    }
+
+    public void startUploadMonitorData() {
+        mUploading = true;
+        if (mUploadMonitorBean != null) {
+            mUploadMonitorBean = null;
+        }
+        if (PerformanceSpInfoConfig.isFPSOpen(mContext)) {
+            startMonitorFrameInfo();
+        }
+        if (PerformanceSpInfoConfig.isCPUOpen(mContext)) {
+            startMonitorCPUInfo();
+        }
+        if (PerformanceSpInfoConfig.isMemoryOpen(mContext)) {
+            startMonitorMemoryInfo();
+        }
+        if (PerformanceSpInfoConfig.isTrafficOpen(mContext)) {
+            NetworkManager.get().startMonitor();
+            startMonitorNetFlowInfo();
+        }
+        mHandler.sendEmptyMessageDelayed(MSG_SAVE_LOCAL, NORMAL_FRAME_RATE * 1000);
+    }
+
+    public void stopUploadMonitorData(){
+        mUploading = false;
+        mHandler.removeMessages(MSG_SAVE_LOCAL);
+        uploadDataToLocalFile();
+        stopMonitorFrameInfo();
+        stopMonitorCPUInfo();
+        stopMonitorMemoryInfo();
+        stopMonitorNetFlowInfo();
+        NetworkManager.get().stopMonitor();
+    }
+
+    public boolean isUploading(){
+        return mUploading;
     }
 
     public void stopMonitorCPUInfo() {
@@ -219,6 +273,45 @@ public class PerformanceDataManager {
         }
         mHandlerThread = null;
         mHandler = null;
+    }
+
+    private void saveToLocal() {
+        if (mUploadMonitorBean == null) {
+            mUploadMonitorBean = new UploadMonitorInfoBean();
+            mUploadMonitorBean.appName = mContext.getPackageName();
+            if(mUploadMonitorBean.performanceArray == null){
+                mUploadMonitorBean.performanceArray = new ArrayList<>();
+            }
+        }
+        NetworkManager networkManager = NetworkManager.get();
+        long upSize = networkManager.getTotalRequestSize();
+        long downSize = networkManager.getTotalResponseSize();
+
+        UploadMonitorItem info = new UploadMonitorItem();
+        info.cpu = mLastCpuRate;
+        info.fps = mLastFrameRate;
+        info.memory = mLastMemoryInfo;
+        info.upFlow = mLastUpBytes;
+        info.downFlow = mLastDownBytes;
+        mUpBytes = upSize;
+        mDownBytes = downSize;
+        info.timestamp = System.currentTimeMillis();
+
+        String pageName = "unkown";
+        if (ActivityUtils.getTopActivity() != null) {
+            pageName = ActivityUtils.getTopActivity().getLocalClassName();
+        }
+        info.page = pageName;
+        mUploadMonitorBean.performanceArray.add(info);
+    }
+
+    private void uploadDataToLocalFile() {
+        ThreadPoolProxyFactory.getThreadPoolProxy().execute(new Runnable() {
+            @Override
+            public void run() {
+                FileManager.writeTxtToFile(JsonUtil.jsonFromObject(mUploadMonitorBean), getFilePath(mContext), customFileName);
+            }
+        });
     }
 
     public void startMonitorMemoryInfo() {
@@ -237,7 +330,7 @@ public class PerformanceDataManager {
         stringBuilder.append(mLastCpuRate);
         stringBuilder.append(" ");
         stringBuilder.append(simpleDateFormat.format(new Date(System.currentTimeMillis())));
-        FileManager.writeTxtToFile(stringBuilder.toString(), filePath, cpuFileName);
+        FileManager.writeTxtToFile(stringBuilder.toString(), getFilePath(mContext), cpuFileName);
     }
 
     private void writeMemoryDataIntoFile() {
@@ -245,7 +338,7 @@ public class PerformanceDataManager {
         stringBuilder.append(mLastMemoryInfo);
         stringBuilder.append(" ");
         stringBuilder.append(simpleDateFormat.format(new Date(System.currentTimeMillis())));
-        FileManager.writeTxtToFile(stringBuilder.toString(), filePath, memoryFileName);
+        FileManager.writeTxtToFile(stringBuilder.toString(), getFilePath(mContext), memoryFileName);
     }
 
     private void writeFpsDataIntoFile() {
@@ -253,7 +346,7 @@ public class PerformanceDataManager {
         stringBuilder.append(mLastFrameRate);
         stringBuilder.append(" ");
         stringBuilder.append(simpleDateFormat.format(new Date(System.currentTimeMillis())));
-        FileManager.writeTxtToFile(stringBuilder.toString(), filePath, fpsFileName);
+        FileManager.writeTxtToFile(stringBuilder.toString(), getFilePath(mContext), fpsFileName);
     }
 
     private float getCPUData() {
@@ -286,7 +379,7 @@ public class PerformanceDataManager {
             mLastCpuTime = cpuTime;
             mLastAppCpuTime = appTime;
         } catch (Exception e) {
-            e.printStackTrace();
+            LogHelper.e(TAG,"getCPUData fail: "+e.toString());
         }
         return value;
     }
@@ -305,7 +398,7 @@ public class PerformanceDataManager {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LogHelper.e(TAG,"getMemoryData fail: "+e.toString());
         }
         return mem;
     }
@@ -357,17 +450,20 @@ public class PerformanceDataManager {
     }
 
     public String getCpuFilePath() {
-        return filePath + cpuFileName;
+        return getFilePath(mContext) + cpuFileName;
     }
 
     public String getMemoryFilePath() {
-        return filePath + memoryFileName;
+        return getFilePath(mContext) + memoryFileName;
     }
 
     public String getFpsFilePath() {
-        return filePath + fpsFileName;
+        return getFilePath(mContext) + fpsFileName;
     }
 
+    public String getCustomFilePath() {
+        return getFilePath(mContext) + customFileName;
+    }
     public long getLastFrameRate() {
         return mLastFrameRate;
     }
@@ -386,5 +482,35 @@ public class PerformanceDataManager {
 
     public float getMaxMemory() {
         return mMaxMemory;
+    }
+
+    private class FrameRateRunnable implements Runnable, Choreographer.FrameCallback {
+        private int totalFramesPerSecond;
+
+        @Override
+        public void run() {
+            mLastFrameRate = totalFramesPerSecond;
+            if (mLastFrameRate > MAX_FRAME_RATE) {
+                mLastFrameRate = MAX_FRAME_RATE;
+            }
+            mLastSkippedFrames = MAX_FRAME_RATE - mLastFrameRate;
+            totalFramesPerSecond = 0;
+            mMainHandler.postDelayed(this, DateUtils.SECOND_IN_MILLIS);
+        }
+
+        @Override
+        public void doFrame(long frameTimeNanos) {
+            totalFramesPerSecond++;
+            Choreographer.getInstance().postFrameCallback(this);
+            writeFpsDataIntoFile();
+        }
+    }
+
+    public long getLastUpBytes() {
+        return mLastUpBytes;
+    }
+
+    public long getLastDownBytes() {
+        return mLastDownBytes;
     }
 }

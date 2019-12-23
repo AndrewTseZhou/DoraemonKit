@@ -29,8 +29,22 @@
 }
 
 - (void)commonInit {
-    self.backgroundColor = [UIColor whiteColor];
-    self.layer.cornerRadius = kDoraemonSizeFrom750(8);
+#if defined(__IPHONE_13_0) && (__IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_13_0)
+    if (@available(iOS 13.0, *)) {
+        self.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+            if (traitCollection.userInterfaceStyle == UIUserInterfaceStyleLight) {
+                return [UIColor whiteColor];
+            } else {
+                return [UIColor secondarySystemBackgroundColor];
+            }
+        }];
+    } else {
+#endif
+        self.backgroundColor = [UIColor whiteColor];
+#if defined(__IPHONE_13_0) && (__IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_13_0)
+    }
+#endif
+    self.layer.cornerRadius = kDoraemonSizeFrom750_Landscape(8);
     self.layer.borderWidth = 1.;
     self.layer.borderColor = [UIColor doraemon_colorWithHex:0x999999 andAlpha:0.2].CGColor;
     
@@ -39,21 +53,37 @@
     [self addSubview:self.closeBtn];
 }
 
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    // trait发生了改变
+#if defined(__IPHONE_13_0) && (__IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_13_0)
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            if (UITraitCollection.currentTraitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                [self.closeBtn setImage:[UIImage doraemon_imageNamed:@"doraemon_close_dark"] forState:UIControlStateNormal];
+            } else {
+                [self.closeBtn setImage:[UIImage doraemon_imageNamed:@"doraemon_close"] forState:UIControlStateNormal];
+            }
+        }
+    }
+#endif
+}
+
 #pragma mark - Layout
 
 - (void)layoutSubviews {
     [super layoutSubviews];
     
-    CGFloat colorWidth = kDoraemonSizeFrom750(28);
-    CGFloat colorHeight = kDoraemonSizeFrom750(28);
-    self.colorView.frame = CGRectMake(kDoraemonSizeFrom750(32), (self.doraemon_height - colorHeight) / 2.0, colorWidth, colorHeight);
+    CGFloat colorWidth = kDoraemonSizeFrom750_Landscape(28);
+    CGFloat colorHeight = kDoraemonSizeFrom750_Landscape(28);
+    self.colorView.frame = CGRectMake(kDoraemonSizeFrom750_Landscape(32), (self.doraemon_height - colorHeight) / 2.0, colorWidth, colorHeight);
     
-    CGFloat colorValueWidth = kDoraemonSizeFrom750(150);
-    self.colorValueLbl.frame = CGRectMake(self.colorView.doraemon_right + kDoraemonSizeFrom750(20), 0, colorValueWidth, self.doraemon_height);
+    CGFloat colorValueWidth = kDoraemonSizeFrom750_Landscape(150);
+    self.colorValueLbl.frame = CGRectMake(self.colorView.doraemon_right + kDoraemonSizeFrom750_Landscape(20), 0, colorValueWidth, self.doraemon_height);
     
-    CGFloat closeWidth = kDoraemonSizeFrom750(44);
-    CGFloat closeHeight = kDoraemonSizeFrom750(44);
-    self.closeBtn.frame = CGRectMake(self.doraemon_width - closeWidth - kDoraemonSizeFrom750(32), (self.doraemon_height - closeHeight) / 2.0, closeWidth, closeHeight);
+    CGFloat closeWidth = kDoraemonSizeFrom750_Landscape(44);
+    CGFloat closeHeight = kDoraemonSizeFrom750_Landscape(44);
+    self.closeBtn.frame = CGRectMake(self.doraemon_width - closeWidth - kDoraemonSizeFrom750_Landscape(32), (self.doraemon_height - closeHeight) / 2.0, closeWidth, closeHeight);
 }
 
 #pragma mark - Public
@@ -72,11 +102,6 @@
 }
 
 #pragma mark - Private
-
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-//    NSLog(@"PickInfoView---触摸开始");
-}
-
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
     
     UITouch *touch = [touches anyObject];
@@ -91,9 +116,6 @@
     self.transform = CGAffineTransformTranslate(self.transform, offsetX, offsetY);
 }
 
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-//    NSLog(@"PickInfoView---触摸结束");
-}
 
 #pragma mark - Getter
 
@@ -110,7 +132,7 @@
     if (!_colorValueLbl) {
         _colorValueLbl = [[UILabel alloc] init];
         _colorValueLbl.textColor = [UIColor doraemon_black_1];
-        _colorValueLbl.font = [UIFont systemFontOfSize:kDoraemonSizeFrom750(28)];
+        _colorValueLbl.font = [UIFont systemFontOfSize:kDoraemonSizeFrom750_Landscape(28)];
     }
     return _colorValueLbl;
 }
@@ -118,7 +140,15 @@
 - (UIButton *)closeBtn {
     if (!_closeBtn) {
         _closeBtn = [[UIButton alloc] init];
-        [_closeBtn setBackgroundImage:[UIImage doraemon_imageNamed:@"doraemon_close"] forState:UIControlStateNormal];
+        UIImage *closeImage = [UIImage doraemon_imageNamed:@"doraemon_close"];
+#if defined(__IPHONE_13_0) && (__IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_13_0)
+        if (@available(iOS 13.0, *)) {
+            if (UITraitCollection.currentTraitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                closeImage = [UIImage doraemon_imageNamed:@"doraemon_close_dark"];
+            }
+        }
+#endif
+        [_closeBtn setBackgroundImage:closeImage forState:UIControlStateNormal];
         [_closeBtn addTarget:self action:@selector(closeBtnClicked:) forControlEvents:UIControlEventTouchUpInside];
     }
     return _closeBtn;

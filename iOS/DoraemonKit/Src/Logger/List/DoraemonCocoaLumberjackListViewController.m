@@ -28,21 +28,21 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    self.title = @"CocoaLumberjack日志记录";
+    self.title = DoraemonLocalizedString(@"CocoaLumberjack日志记录");
     
     self.origArray = [NSArray arrayWithArray:[DoraemonCocoaLumberjackLogger sharedInstance].messages];
     self.dataArray = [NSArray arrayWithArray:self.origArray];
     
-    _searchView = [[DoraemonNSLogSearchView alloc] initWithFrame:CGRectMake(kDoraemonSizeFrom750(32), IPHONE_NAVIGATIONBAR_HEIGHT+kDoraemonSizeFrom750(32), self.view.doraemon_width-2*kDoraemonSizeFrom750(32), kDoraemonSizeFrom750(100))];
+    _searchView = [[DoraemonNSLogSearchView alloc] initWithFrame:CGRectMake(kDoraemonSizeFrom750_Landscape(32), IPHONE_NAVIGATIONBAR_HEIGHT+kDoraemonSizeFrom750_Landscape(32), self.view.doraemon_width-2*kDoraemonSizeFrom750_Landscape(32), kDoraemonSizeFrom750_Landscape(100))];
     _searchView.delegate = self;
     [self.view addSubview:_searchView];
     
-    _levelView = [[DoraemonCocoaLumberjackLevelView alloc] initWithFrame:CGRectMake(0, _searchView.doraemon_bottom+kDoraemonSizeFrom750(32), self.view.doraemon_width, kDoraemonSizeFrom750(68))];
+    _levelView = [[DoraemonCocoaLumberjackLevelView alloc] initWithFrame:CGRectMake(0, _searchView.doraemon_bottom+kDoraemonSizeFrom750_Landscape(32), self.view.doraemon_width, kDoraemonSizeFrom750_Landscape(68))];
     _levelView.delegate = self;
     [self.view addSubview:_levelView];
     
-    self.tableView = [[UITableView alloc] initWithFrame:CGRectMake(0, _levelView.doraemon_bottom+kDoraemonSizeFrom750(32), self.view.doraemon_width, self.view.doraemon_height-_searchView.doraemon_bottom-kDoraemonSizeFrom750(32)) style:UITableViewStylePlain];
-    self.tableView.backgroundColor = [UIColor whiteColor];
+    self.tableView = [[UITableView alloc] initWithFrame:CGRectMake(0, _levelView.doraemon_bottom+kDoraemonSizeFrom750_Landscape(32), self.view.doraemon_width, self.view.doraemon_height-_searchView.doraemon_bottom-kDoraemonSizeFrom750_Landscape(32)) style:UITableViewStylePlain];
+//    self.tableView.backgroundColor = [UIColor whiteColor];
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.delegate = self;
     self.tableView.dataSource = self;
@@ -60,7 +60,7 @@
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    DoraemonCocoaLumberjackListCell* model = [self.dataArray objectAtIndex:indexPath.row];
+    DoraemonDDLogMessage* model = [self.dataArray objectAtIndex:indexPath.row];
     return [DoraemonCocoaLumberjackListCell cellHeightWith:model];
 }
 
@@ -118,26 +118,26 @@
     NSLog(@"%zi",DDLogFlagVerbose);
     DDLogFlag flag = DDLogFlagVerbose;
     if (index==0) {
-        flag = DDLogFlagVerbose;
+        flag = DDLogFlagVerbose;//16
     }else if(index==1){
-        flag = DDLogFlagDebug;
+        flag = DDLogFlagDebug;//8
     }else if(index==2){
-        flag = DDLogFlagInfo;
+        flag = DDLogFlagInfo;//4
     }else if(index==3){
-        flag = DDLogFlagWarning;
+        flag = DDLogFlagWarning;//2
     }else if(index==4){
-        flag = DDLogFlagError;
+        flag = DDLogFlagError;//1
     }
     
     NSArray *dataArray = self.origArray;
     NSMutableArray *resultArray = [[NSMutableArray alloc] init];
     for(DoraemonDDLogMessage *model in dataArray){
-        DDLogFlag *modelFlag = model.flag;
+        DDLogFlag modelFlag = model.flag;
         if (modelFlag <= flag) {
             [resultArray addObject:model];
         }
-        self.dataArray = [[NSArray alloc] initWithArray:resultArray];
     }
+    self.dataArray = [[NSArray alloc] initWithArray:resultArray];
     [self.tableView reloadData];
     
 }

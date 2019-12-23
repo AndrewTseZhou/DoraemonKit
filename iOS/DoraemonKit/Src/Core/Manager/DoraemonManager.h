@@ -6,10 +6,22 @@
 //
 
 #import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 
+
+NS_ASSUME_NONNULL_BEGIN
 typedef void (^DoraemonH5DoorBlock)(NSString *);
 
 typedef NS_ENUM(NSUInteger, DoraemonManagerPluginType) {
+    #pragma mark - weex专项工具
+    // 日志
+    DoraemonManagerPluginType_DoraemonWeexLogPlugin,
+    // 缓存
+    DoraemonManagerPluginType_DoraemonWeexStoragePlugin,
+    // 信息
+    DoraemonManagerPluginType_DoraemonWeexInfoPlugin,
+    // DevTool
+    DoraemonManagerPluginType_DoraemonWeexDevToolPlugin,
     #pragma mark - 常用工具
     // App信息
     DoraemonManagerPluginType_DoraemonAppInfoPlugin,
@@ -29,6 +41,10 @@ typedef NS_ENUM(NSUInteger, DoraemonManagerPluginType) {
     DoraemonManagerPluginType_DoraemonNSLogPlugin,
     // 日志显示
     DoraemonManagerPluginType_DoraemonCocoaLumberjackPlugin,
+    // 数据库工具
+    DoraemonManagerPluginType_DoraemonDatabasePlugin,
+    // NSUserDefaults工具
+    DoraemonManagerPluginType_DoraemonNSUserDefaultsPlugin,
     
     #pragma mark - 性能检测
     // 帧率监控
@@ -45,6 +61,18 @@ typedef NS_ENUM(NSUInteger, DoraemonManagerPluginType) {
     DoraemonManagerPluginType_DoraemonAllTestPlugin,
     // Load耗时
     DoraemonManagerPluginType_DoraemonMethodUseTimePlugin,
+    // 大图检测
+    DoraemonManagerPluginType_DoraemonLargeImageFilter,
+    // 启动耗时
+    DoraemonManagerPluginType_DoraemonStartTimePlugin,
+    // 内存泄漏
+    DoraemonManagerPluginType_DoraemonMemoryLeakPlugin,
+    // UI层级检查
+    DoraemonManagerPluginType_DoraemonUIProfilePlugin,
+    // UI结构调整
+    DoraemonManagerPluginType_DoraemonHierarchyPlugin,
+    // 函数耗时
+    DoraemonManagerPluginType_DoraemonTimeProfilePlugin,
     
     #pragma mark - 视觉工具
     // 颜色吸管
@@ -69,20 +97,25 @@ typedef NS_ENUM(NSUInteger, DoraemonManagerPluginType) {
 
 @interface DoraemonManager : NSObject
 
-+ (DoraemonManager *)shareInstance;
++ (nonnull DoraemonManager *)shareInstance;
 
 - (void)install;
 
-- (void)installWithCustomBlock:(void(^)())customBlock;
+// 定制起始位置 | 适用正好挡住关键位置
+- (void)installWithStartingPosition:(CGPoint) position;
+
+- (void)installWithCustomBlock:(void(^)(void))customBlock;
 
 @property (nonatomic,strong) NSMutableArray *dataArray;
 
 @property (nonatomic, copy) DoraemonH5DoorBlock h5DoorBlock;
 
 - (void)addPluginWithTitle:(NSString *)title icon:(NSString *)iconName desc:(NSString *)desc pluginName:(NSString *)entryName atModule:(NSString *)moduleName;
+- (void)addPluginWithTitle:(NSString *)title icon:(NSString *)iconName desc:(NSString *)desc pluginName:(NSString *)entryName atModule:(NSString *)moduleName handle:(void(^)(NSDictionary *itemData))handleBlock;
+
 
 - (void)removePluginWithPluginType:(DoraemonManagerPluginType)pluginType;
-// 推荐使用 removePluginWithPluginType 方法
+
 - (void)removePluginWithPluginName:(NSString *)pluginName atModule:(NSString *)moduleName;
 
 - (void)addStartPlugin:(NSString *)pluginName;
@@ -91,10 +124,19 @@ typedef NS_ENUM(NSUInteger, DoraemonManagerPluginType) {
 
 - (void)addANRBlock:(void(^)(NSDictionary *anrDic))block;
 
-- (void)addperformanceBlock:(void(^)(NSDictionary *performanceDic))block;
+- (void)addPerformanceBlock:(void(^)(NSDictionary *performanceDic))block;
+
+- (BOOL)isShowDoraemon;
+
+- (void)showDoraemon;
 
 - (void)hiddenDoraemon;
 
 - (void)hiddenHomeWindow;
 
+@property (nonatomic, assign) int64_t bigImageDetectionSize; // 外部设置大图检测的监控数值  比如监控所有图片大于50K的图片 那么这个值就设置为 50 * 1024；
+
+@property (nonatomic, copy) NSString *startClass; //如果你的启动代理不是默认的AppDelegate,需要传入才能获取正确的启动时间
+
 @end
+NS_ASSUME_NONNULL_END

@@ -7,19 +7,20 @@
 
 #import "DoraemonSandboxViewController.h"
 #import "DoraemonSandboxModel.h"
-#import "DoraemonSandBoxCell.h"
 #import "DoraemonSanboxDetailViewController.h"
-#import "Doraemoni18NUtil.h"
-#import "UIView+Doraemon.h"
 #import "DoraemonNavBarItemModel.h"
-#import "UIImage+Doraemon.h"
+#import "DoraemonAppInfoUtil.h"
+#import "DoraemonDefine.h"
+#import "DoraemonSandboxCell.h"
 
-@interface DoraemonSandboxViewController ()<UITableViewDelegate,UITableViewDataSource>
+@interface DoraemonSandboxViewController () <UITableViewDelegate, UITableViewDataSource>
 
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) DoraemonSandboxModel *currentDirModel;
 @property (nonatomic, copy) NSArray *dataArray;
 @property (nonatomic, copy) NSString *rootPath;
+
+@property (nonatomic, strong) DoraemonNavBarItemModel *leftModel;
 
 @end
 
@@ -31,31 +32,46 @@
     [self initUI];
 }
 
-- (void)viewWillAppear:(BOOL)animated{
+- (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self loadPath:_currentDirModel.path];
 }
 
-- (BOOL)needBigTitleView{
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    // trait发生了改变
+#if defined(__IPHONE_13_0) && (__IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_13_0)
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            if (UITraitCollection.currentTraitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                self.leftModel.image = [UIImage doraemon_imageNamed:@"doraemon_back_dark"];
+            } else {
+                self.leftModel.image = [UIImage doraemon_imageNamed:@"doraemon_back"];
+            }
+        }
+    }
+#endif
+}
+
+- (BOOL)needBigTitleView {
     return YES;
 }
 
-- (void)initData{
+- (void)initData {
     _dataArray = @[];
     _rootPath = NSHomeDirectory();
 }
 
-- (void)initUI{
+- (void)initUI {
     self.title = DoraemonLocalizedString(@"沙盒浏览器");
     self.tableView = [[UITableView alloc] initWithFrame:CGRectMake(0, self.bigTitleView.doraemon_bottom, self.view.doraemon_width, self.view.doraemon_height-self.bigTitleView.doraemon_bottom) style:UITableViewStylePlain];
-    self.tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
     self.tableView.delegate = self;
     self.tableView.dataSource = self;
     [self.view addSubview:self.tableView];
 }
 
 
-- (void)loadPath : (NSString *)filePath{
+- (void)loadPath:(NSString *)filePath {
     NSFileManager *fm = [NSFileManager defaultManager];
     NSString *targetPath = filePath;
     //该目录信息
@@ -71,14 +87,22 @@
     }else{
         model.name = DoraemonLocalizedString(@"返回上一级");
         model.type = DoraemonSandboxFileTypeBack;
-        self.tableView.frame = CGRectMake(0, 0, self.view.doraemon_width, self.view.doraemon_height);
         self.bigTitleView.hidden = YES;
         self.navigationController.navigationBarHidden = NO;
+        self.tableView.frame = CGRectMake(0, IPHONE_NAVIGATIONBAR_HEIGHT, self.view.doraemon_width, self.view.doraemon_height-IPHONE_NAVIGATIONBAR_HEIGHT);
         NSString *dirTitle =  [fm displayNameAtPath:targetPath];
         self.title = dirTitle;
-        DoraemonNavBarItemModel *leftModel = [[DoraemonNavBarItemModel alloc] initWithImage:[UIImage doraemon_imageNamed:@"doraemon_back"] selector:@selector(leftNavBackClick:)];
+        UIImage *image = [UIImage doraemon_imageNamed:@"doraemon_back"];
+#if defined(__IPHONE_13_0) && (__IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_13_0)
+        if (@available(iOS 13.0, *)) {
+            if (UITraitCollection.currentTraitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                image = [UIImage doraemon_imageNamed:@"doraemon_back_dark"];
+            }
+        }
+#endif
+        self.leftModel = [[DoraemonNavBarItemModel alloc] initWithImage:image selector:@selector(leftNavBackClick:)];
         
-        [self setLeftNavBarItems:@[leftModel]];
+        [self setLeftNavBarItems:@[self.leftModel]];
     }
     model.path = filePath;
     _currentDirModel = model;
@@ -112,11 +136,11 @@
 
 
 #pragma mark- UITableViewDelegate
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section{
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     return _dataArray.count;
 }
 
-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath{
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     static NSString *cellId = @"cellId";
     DoraemonSandBoxCell *cell = [tableView dequeueReusableCellWithIdentifier:cellId];
     if (!cell) {
@@ -135,37 +159,44 @@
     return DoraemonLocalizedString(@"删除");
 }
 
-- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath{
+- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
     DoraemonSandboxModel *model = _dataArray[indexPath.row];
     [self deleteByDoraemonSandboxModel:model];
 }
 
 
 #pragma mark- UITableViewDataSource
-- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath{
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
     return [DoraemonSandBoxCell cellHeight];
 }
 
-- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath{
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     DoraemonSandboxModel *model = _dataArray[indexPath.row];
     if (model.type == DoraemonSandboxFileTypeFile) {
         [self handleFileWithPath:model.path];
-    }else if(model.type == DoraemonSandboxFileTypeDirectory){
+    } else if (model.type == DoraemonSandboxFileTypeDirectory) {
         [self loadPath:model.path];
     }
 }
 
 
-- (void)leftNavBackClick:(id)clickView{
+- (void)leftNavBackClick:(id)clickView {
     if (_currentDirModel.type == DoraemonSandboxFileTypeRoot) {
         [super leftNavBackClick:clickView];
-    }else{
+    } else {
         [self loadPath:[_currentDirModel.path stringByDeletingLastPathComponent]];
     }
 }
 
-- (void)handleFileWithPath:(NSString *)filePath{
-    UIAlertController *alertVc = [UIAlertController alertControllerWithTitle:DoraemonLocalizedString(@"请选择操作方式") message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+- (void)handleFileWithPath:(NSString *)filePath {
+    UIAlertControllerStyle style;
+    if ([DoraemonAppInfoUtil isIpad]) {
+        style = UIAlertControllerStyleAlert;
+    } else {
+        style = UIAlertControllerStyleActionSheet;
+    }
+    
+    UIAlertController *alertVc = [UIAlertController alertControllerWithTitle:DoraemonLocalizedString(@"请选择操作方式") message:nil preferredStyle:style];
     __weak typeof(self) weakSelf = self;
     UIAlertAction *previewAction = [UIAlertAction actionWithTitle:DoraemonLocalizedString(@"本地预览") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
         __strong typeof(self) strongSelf = weakSelf;
@@ -184,14 +215,14 @@
     [self presentViewController:alertVc animated:YES completion:nil];
 }
 
-- (void)previewFile:(NSString *)filePath{
+- (void)previewFile:(NSString *)filePath {
     DoraemonSanboxDetailViewController *detalVc = [[DoraemonSanboxDetailViewController alloc] init];
     detalVc.filePath = filePath;
     [self.navigationController pushViewController:detalVc animated:YES];
 }
 
 
-- (void)shareFileWithPath:(NSString *)filePath{
+- (void)shareFileWithPath:(NSString *)filePath {
     NSURL *url = [NSURL fileURLWithPath:filePath];
     NSArray *objectsToShare = @[url];
 
@@ -205,10 +236,17 @@
                                     UIActivityTypePostToVimeo, UIActivityTypePostToTencentWeibo];
     controller.excludedActivityTypes = excludedActivities;
 
-    [self presentViewController:controller animated:YES completion:nil];
+    if([DoraemonAppInfoUtil isIpad]){
+        if ( [controller respondsToSelector:@selector(popoverPresentationController)] ) {
+            controller.popoverPresentationController.sourceView = self.view;
+        }
+        [self presentViewController:controller animated:YES completion:nil];
+    }else{
+        [self presentViewController:controller animated:YES completion:nil];
+    }
 }
 
-- (void)deleteByDoraemonSandboxModel:(DoraemonSandboxModel *)model{
+- (void)deleteByDoraemonSandboxModel:(DoraemonSandboxModel *)model {
     NSFileManager *fm = [NSFileManager defaultManager];
     [fm removeItemAtPath:model.path error:nil];
     [self loadPath:_currentDirModel.path];

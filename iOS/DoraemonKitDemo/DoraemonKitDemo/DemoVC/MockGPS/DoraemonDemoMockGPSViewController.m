@@ -25,7 +25,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"模拟位置";
+    self.title = DoraemonLocalizedString(@"模拟位置");
     
     //初始化地图
     MKMapView *mapView = [[MKMapView alloc] initWithFrame:CGRectMake(0, IPHONE_NAVIGATIONBAR_HEIGHT, self.view.doraemon_width, self.view.doraemon_height)];
@@ -49,7 +49,8 @@
 
 /** 获取到新的位置信息时调用*/
 -(void)locationManager:(CLLocationManager *)manager didUpdateLocations:(NSArray *)locations{
-    NSLog(@"定位到了");
+    NSLog(@"定位到了 %@",locations);
+    
 }
 /** 不能获取位置信息时调用*/
 -(void)locationManager:(CLLocationManager *)manager didFailWithError:(NSError *)error{
